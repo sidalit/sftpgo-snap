@@ -1,0 +1,53 @@
+#!/bin/sh
+# Validate `snap set sftpgo ...` and restart the service so changes apply.
+set -eu
+
+[ -n "$(snapctl get sftp-address)" ] || snapctl set sftp-address=:2022
+[ -n "$(snapctl get http-address)" ] || snapctl set http-address=127.0.0.1:8080
+[ -n "$(snapctl get users-base-dir)" ] || snapctl set users-base-dir="$SNAP_COMMON/data"
+
+# FTP and WebDAV stay disabled while their address is unset.
+for key in sftp-address http-address ftp-address webdav-address; do
+  address="$(snapctl get "$key")"
+  [ -n "$address" ] || continue
+  case "$address" in
+    *[![:print:]]*)
+      echo "$key must not contain control characters" >&2
+      exit 1
+      ;;
+  esac
+  if ! printf '%s\n' "$address" | grep -Eq '^([A-Za-z0-9][A-Za-z0-9.-]*|\[[0-9A-Fa-f:.]+\])?:[0-9]{1,5}$'; then
+    echo "$key must be host:port, [IPv6]:port or :port" >&2
+    exit 1
+  fi
+  port="${address##*:}"
+  if [ "$port" -lt 1 ] || [ "$port" -gt 65535 ]; then
+    echo "$key port must be between 1 and 65535" >&2
+    exit 1
+  fi
+done
+
+# The service can only reach its own data and, once connected, external drives.
+dir="$(snapctl get users-base-dir)"
+case "$dir" in
+  *[![:print:]]* | */../* | */..)
+    echo 'users-base-dir must be a plain absolute path' >&2
+    exit 1
+    ;;
+  "$SNAP_COMMON"/?*) ;;
+  /media/?* | /mnt/?* | /run/media/?*)
+    if ! snapctl is-connected removable-media; then
+      echo "users-base-dir on an external drive needs: sudo snap connect $SNAP_INSTANCE_NAME:removable-media" >&2
+      exit 1
+    fi
+    ;;
+  *)
+    echo "users-base-dir must be under $SNAP_COMMON, /media, /mnt or /run/media" >&2
+    exit 1
+    ;;
+esac
+
+# Also restart an enabled service that is down, so fixing a bad value brings it back.
+if snapctl services "$SNAP_INSTANCE_NAME.daemon" | grep -qwE 'enabled|active'; then
+  snapctl restart "$SNAP_INSTANCE_NAME.daemon"
+fi

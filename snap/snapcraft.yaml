@@ -1,0 +1,127 @@
+name: sftpgo
+base: core26
+version: '2.7.6'
+title: SFTPGo
+icon: snap/gui/sftpgo.png
+summary: File transfer server for SFTP, HTTP/S, FTP/S and WebDAV
+description: |
+  SFTPGo is a file transfer server for SFTP, HTTP/S, FTP/S and WebDAV. It
+  stores files on the local filesystem, optionally encrypted, or in
+  S3-compatible, Google Cloud and Azure Blob storage and on other SFTP
+  servers. Users, groups, quotas, shares and event rules are managed in the
+  web administration interface or with the REST API, and users can reach
+  their files in the web client.
+
+  **Getting started**
+
+  The service starts right after installation. SFTP listens on port 2022 on
+  all interfaces; no account exists yet. The web interfaces and the REST API
+  listen on 127.0.0.1:8080 (this machine only). Open
+  http://127.0.0.1:8080/web/admin and create the first administrator with
+  the installation code generated for this machine:
+
+     sudo cat /var/snap/sftpgo/common/credentials/installation-code
+
+  Then add users and connect, for example with sftp -P 2022 alice@server.
+
+  **Settings**
+
+  To open the web interfaces to your network, or to enable FTP and WebDAV:
+
+     sudo snap set sftpgo http-address=:8080
+     sudo snap set sftpgo ftp-address=:2121 webdav-address=:8090
+
+  Other settings go in /var/snap/sftpgo/common/sftpgo.json; restart the
+  service after editing:
+
+     sudo snap restart sftpgo.daemon
+
+  **Storage**
+
+  Users' files are kept in /var/snap/sftpgo/common/data. To keep them on a
+  drive mounted under /media or /mnt, in a folder owned by root:
+
+     sudo snap connect sftpgo:removable-media
+     sudo snap set sftpgo users-base-dir=/mnt/disk1/sftpgo
+
+  SFTPGo is licensed under AGPL-3.0-only with additional terms. The theme of
+  its web interfaces is proprietary and may only be used within SFTPGo.
+license: AGPL-3.0-only
+grade: stable
+confinement: strict
+website: https://sftpgo.com
+source-code:
+  - https://github.com/drakkan/sftpgo
+  - https://github.com/sidalit/sftpgo-snap
+issues:
+  - https://github.com/drakkan/sftpgo/issues
+  - https://github.com/sidalit/sftpgo-snap/issues
+contact: https://github.com/sidalit/sftpgo-snap/issues
+
+platforms:
+  amd64:
+  arm64:
+
+apps:
+  sftpgo:
+    command: bin/sftpgo-cli
+    completer: share/bash-completion/completions/sftpgo
+    plugs:
+      - home
+      - network
+      - network-bind
+      - removable-media
+  daemon:
+    command: bin/sftpgo-daemon
+    daemon: simple
+    restart-condition: on-failure
+    restart-delay: 10s
+    plugs:
+      - network
+      - network-bind
+      - removable-media
+
+parts:
+  sftpgo:
+    plugin: nil
+    source: https://github.com/drakkan/sftpgo.git
+    source-tag: v$SNAPCRAFT_PROJECT_VERSION
+    source-depth: 1
+    build-snaps:
+      - go/1.27/stable
+    build-packages:
+      # The SQLite data provider is built with cgo.
+      - build-essential
+      - git
+    build-environment:
+      - CGO_ENABLED: '1'
+      - GOTOOLCHAIN: local
+    override-build: |
+      # Same tags and flags as upstream's release workflow. The last one adds
+      # the snap to the folders searched for the web interface files, which
+      # upstream's packages install under /usr/share/sftpgo.
+      go build -buildvcs=false -trimpath \
+        -tags nopgxregisterdefaulttypes,disable_grpc_modules \
+        -ldflags "-s -w \
+          -X github.com/drakkan/sftpgo/v2/internal/version.commit=$(git rev-parse --short=8 HEAD) \
+          -X github.com/drakkan/sftpgo/v2/internal/version.date=$(date -u +%FT%TZ) \
+          -X github.com/drakkan/sftpgo/v2/internal/util.additionalSharedDataSearchPath=/snap/sftpgo/current/share/sftpgo" \
+        -o "$CRAFT_PART_INSTALL/bin/sftpgo"
+
+      mkdir -p "$CRAFT_PART_INSTALL/share/sftpgo"
+      cp -r templates static openapi "$CRAFT_PART_INSTALL/share/sftpgo/"
+
+      # The generated script calls old bash-completion helper names, which a snap
+      # only gets from the host's /etc. The prepended file defines them when missing.
+      completion="$CRAFT_PART_INSTALL/share/bash-completion/completions/sftpgo"
+      install -Dm644 "$CRAFT_PROJECT_DIR/snap/local/completion-compat.bash" "$completion"
+      "$CRAFT_PART_INSTALL/bin/sftpgo" gen completion bash >> "$completion"
+      # The terms of the web interface theme are only stated in the README.
+      install -Dm644 LICENSE NOTICE README.md -t "$CRAFT_PART_INSTALL/share/doc/sftpgo"
+
+  scripts:
+    plugin: dump
+    source: snap/local
+    # completion-compat.bash is only used while building the sftpgo part.
+    stage:
+      - bin

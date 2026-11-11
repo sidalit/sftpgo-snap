@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+
+. "$SNAP/bin/sftpgo-env"
+
+exec "$SNAP/bin/sftpgo" "$@"

@@ -1,0 +1,20 @@
+#!/bin/sh
+# Default settings, and a random code that protects the creation of the first
+# administrator, which SFTPGo otherwise offers to the first visitor.
+set -eu
+
+snapctl set sftp-address=:2022 http-address=127.0.0.1:8080 \
+  users-base-dir="$SNAP_COMMON/data"
+
+umask 077
+mkdir -p "$SNAP_COMMON/credentials" "$SNAP_COMMON/env.d"
+code="$SNAP_COMMON/credentials/installation-code"
+if [ ! -s "$code" ]; then
+  tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 20 > "$code"
+  echo >> "$code"
+fi
+
+# Upstream settings that have no snap option go in this file.
+if [ ! -e "$SNAP_COMMON/sftpgo.json" ]; then
+  echo '{}' > "$SNAP_COMMON/sftpgo.json"
+fi
