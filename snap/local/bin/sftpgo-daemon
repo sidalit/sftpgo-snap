@@ -1,11 +1,9 @@
 #!/bin/sh
-# Start the service with the settings from `snap set sftpgo ...`.
 set -eu
 
 . "$SNAP/bin/sftpgo-env"
 
-# Create the default folder for users' files; another one must already exist,
-# so that an unmounted drive stops the service instead of filling this disk.
+# An unmounted drive must stop the service, not fill this disk.
 mkdir -p "$SNAP_COMMON/data"
 if [ ! -d "$SFTPGO_DATA_PROVIDER__USERS_BASE_DIR" ]; then
   echo "users-base-dir $SFTPGO_DATA_PROVIDER__USERS_BASE_DIR does not exist or cannot be reached" >&2
@@ -13,5 +11,5 @@ if [ ! -d "$SFTPGO_DATA_PROVIDER__USERS_BASE_DIR" ]; then
 fi
 
 cd "$SNAP_COMMON"
-# Log to the journal. SFTPGO_LOG_FILE_PATH in an env.d file selects a log file.
+# An empty path logs to the journal.
 exec "$SNAP/bin/sftpgo" serve --log-file-path ''

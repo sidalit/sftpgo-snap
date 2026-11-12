@@ -90,16 +90,12 @@ parts:
     build-snaps:
       - go/1.27/stable
     build-packages:
-      # The SQLite data provider is built with cgo.
       - build-essential
       - git
     build-environment:
       - CGO_ENABLED: '1'
       - GOTOOLCHAIN: local
     override-build: |
-      # Same tags and flags as upstream's release workflow. The last one adds
-      # the snap to the folders searched for the web interface files, which
-      # upstream's packages install under /usr/share/sftpgo.
       go build -buildvcs=false -trimpath \
         -tags nopgxregisterdefaulttypes,disable_grpc_modules \
         -ldflags "-s -w \
@@ -111,8 +107,6 @@ parts:
       mkdir -p "$CRAFT_PART_INSTALL/share/sftpgo"
       cp -r templates static openapi "$CRAFT_PART_INSTALL/share/sftpgo/"
 
-      # The generated script calls old bash-completion helper names, which a snap
-      # only gets from the host's /etc. The prepended file defines them when missing.
       completion="$CRAFT_PART_INSTALL/share/bash-completion/completions/sftpgo"
       install -Dm644 "$CRAFT_PROJECT_DIR/snap/local/completion-compat.bash" "$completion"
       "$CRAFT_PART_INSTALL/bin/sftpgo" gen completion bash >> "$completion"
@@ -122,6 +116,5 @@ parts:
   scripts:
     plugin: dump
     source: snap/local
-    # completion-compat.bash is only used while building the sftpgo part.
     stage:
       - bin

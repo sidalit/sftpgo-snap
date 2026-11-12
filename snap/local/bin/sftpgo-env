@@ -1,17 +1,10 @@
-# Sourced by the sftpgo wrappers. Root works on the service's configuration
-# directory with the snap options applied. Other users get a configuration
-# directory of their own, where `sftpgo portable` keeps its host keys.
-
 if [ "$(id -u)" -ne 0 ]; then
   export SFTPGO_CONFIG_DIR="${SFTPGO_CONFIG_DIR:-$SNAP_USER_COMMON}"
 else
-  # Keep the database, the host keys and the stored files private to root.
-  # The "umask" setting of sftpgo.json changes this for the service.
   umask 077
   export SFTPGO_CONFIG_DIR="${SFTPGO_CONFIG_DIR:-$SNAP_COMMON}"
 
-  # A snap option replaces the address and port of a service's first binding.
-  # SFTPGo wants an IPv6 address in brackets, as it is written in the option.
+  # SFTPGo wants an IPv6 address in brackets, as written in the option.
   export_binding() {
     if [ -n "$2" ]; then
       export "SFTPGO_${1}__BINDINGS__0__ADDRESS=${2%:*}" "SFTPGO_${1}__BINDINGS__0__PORT=${2##*:}"
@@ -25,7 +18,6 @@ else
   SFTPGO_DATA_PROVIDER__USERS_BASE_DIR="$(snapctl get users-base-dir)"
   export SFTPGO_DATA_PROVIDER__USERS_BASE_DIR
 
-  # Creating the first administrator in the web interface asks for this code.
   if [ -s "$SNAP_COMMON/credentials/installation-code" ]; then
     SFTPGO_HTTPD__SETUP__INSTALLATION_CODE="$(cat "$SNAP_COMMON/credentials/installation-code")"
     export SFTPGO_HTTPD__SETUP__INSTALLATION_CODE

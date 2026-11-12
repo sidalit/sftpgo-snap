@@ -1,12 +1,10 @@
 #!/bin/sh
-# Validate `snap set sftpgo ...` and restart the service so changes apply.
 set -eu
 
 [ -n "$(snapctl get sftp-address)" ] || snapctl set sftp-address=:2022
 [ -n "$(snapctl get http-address)" ] || snapctl set http-address=127.0.0.1:8080
 [ -n "$(snapctl get users-base-dir)" ] || snapctl set users-base-dir="$SNAP_COMMON/data"
 
-# FTP and WebDAV stay disabled while their address is unset.
 for key in sftp-address http-address ftp-address webdav-address; do
   address="$(snapctl get "$key")"
   [ -n "$address" ] || continue
@@ -47,7 +45,6 @@ case "$dir" in
     ;;
 esac
 
-# Also restart an enabled service that is down, so fixing a bad value brings it back.
 if snapctl services "$SNAP_INSTANCE_NAME.daemon" | grep -qwE 'enabled|active'; then
   snapctl restart "$SNAP_INSTANCE_NAME.daemon"
 fi
